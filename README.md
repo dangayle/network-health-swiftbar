@@ -16,7 +16,7 @@ The menu bar shows live round-trip time to your router with a color verdict:
 The plugin measures three layers in parallel, each one segment further along the path:
 
 1. **Router** — ICMP ping to your default gateway. Covers only your Wi-Fi and local LAN.
-2. **ISP first hop** — the first node past your router (e.g. your Xfinity CGNAT hop), measured with traceroute TTL-exceeded probes because some ISP hops ignore ICMP echo.
+2. **ISP first hop** — the first node past your router, measured with traceroute TTL-exceeded probes because some ISP hops (e.g. CGNAT gateways) ignore ICMP echo.
 3. **Internet references** — ICMP ping to Cloudflare (`1.1.1.1`) and Google (`8.8.8.8`), which travel through your ISP.
 
 Clicking the menu bar item shows per-layer RTT and packet loss, plus a one-click macOS `networkQuality` test.

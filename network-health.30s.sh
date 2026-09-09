@@ -13,10 +13,11 @@
 #
 # Layers measured (each adds one segment of the path):
 #   1. Router        — your Wi-Fi + local LAN only (ICMP ping)
-#   2. ISP first hop — first Xfinity node past your router.
+#   2. ISP first hop — first node past your router.
 #                      Measured with traceroute TTL-exceeded probes, because
-#                      Xfinity's CGNAT hop ignores ICMP echo (observed 2026-09).
-#   3. Internet refs — Cloudflare 1.1.1.1 + Google 8.8.8.8, through Xfinity (ICMP ping)
+#                      some ISP CGNAT hops ignore ICMP echo (observed on
+#                      Xfinity, 2026-09; the technique works on any ISP).
+#   3. Internet refs — Cloudflare 1.1.1.1 + Google 8.8.8.8, through your ISP (ICMP ping)
 #
 # Tune thresholds with env vars (GW_MAX_MS, ISP_MAX_MS, REF_MAX_MS, LOSS_MAX).
 #
@@ -26,7 +27,7 @@
 # path if fixed thresholds flap.
 
 GW_MAX_MS=${GW_MAX_MS:-30}    # router avg RTT above this = local link degraded
-ISP_MAX_MS=${ISP_MAX_MS:-60}  # ISP first hop avg RTT above this = Xfinity degraded
+ISP_MAX_MS=${ISP_MAX_MS:-60}  # ISP first hop avg RTT above this = ISP access degraded
 REF_MAX_MS=${REF_MAX_MS:-100} # internet reference avg RTT above this = upstream degraded
 LOSS_MAX=${LOSS_MAX:-2}       # loss % above this at any layer = degraded
 GW_COUNT=${GW_COUNT:-4}
@@ -69,7 +70,7 @@ classify() {
   fi
   # ISP tier only usable when the hop answers traceroute probes
   if [[ $ia != -1 ]] && { [[ $(gt "$il" "$LOSS_MAX") == 1 || $(gt "$ia" "$ISP_MAX_MS") == 1 ]]; }; then
-    printf 'yellow\tISP access degraded — Xfinity first hop %sms, %s%% probes unanswered' "$ia" "$il"; return
+    printf 'yellow\tISP access degraded — first ISP hop %sms, %s%% probes unanswered' "$ia" "$il"; return
   fi
   local bad1=0 bad2=0
   [[ $(gt "$l1" "$LOSS_MAX") == 1 || $a1 == -1 || $(gt "$a1" "$REF_MAX_MS") == 1 ]] && bad1=1
@@ -103,7 +104,7 @@ selftest() {
   assert "yellow one"   "$(classify 0 8 0 15 0 15 0 200 | cut -f1)" "yellow"
   assert "yellow loss"  "$(classify 0 8 0 15 3 15 0 14 | cut -f1)" "yellow"
   assert "gray"         "$(classify -1 -1 -1 -1 0 15 0 14 | cut -f1)" "gray"
-  [[ $(classify 0 8 0 80 0 15 0 14 | cut -f2) == *"Xfinity"* ]] || { echo "FAIL isp reason text"; fails=$((fails+1)); }
+  [[ $(classify 0 8 0 80 0 15 0 14 | cut -f2) == *"ISP hop"* ]] || { echo "FAIL isp reason text"; fails=$((fails+1)); }
   echo "selftest: $fails failure(s)"
   (( fails == 0 ))
 }
@@ -140,7 +141,7 @@ rtt_display=$([[ $ga == -1 ]] && echo "—" || echo "${ga}ms")
 # --- SwiftBar output ---
 echo "● $rtt_display | color=$color tooltip=$reason"
 echo ---
-echo "Layers: 1 Router = your Wi-Fi · 2 ISP hop = Xfinity · 3 Refs = open internet"
+echo "Layers: 1 Router = your Wi-Fi · 2 ISP hop = your provider · 3 Refs = open internet"
 echo ---
 detail() { # label loss avg max_ms
   local c=green
@@ -150,9 +151,9 @@ detail() { # label loss avg max_ms
 }
 detail "Layer 1 — Wi-Fi to router ($GW)" "$gl" "$ga" "$GW_MAX_MS"
 if [[ $ia != -1 ]]; then
-  detail "Layer 2 — Xfinity first hop ($isp_ip)" "$il" "$ia" "$ISP_MAX_MS"
+  detail "Layer 2 — ISP first hop ($isp_ip)" "$il" "$ia" "$ISP_MAX_MS"
 else
-  echo "Layer 2 — Xfinity first hop: no response to probes | color=gray"
+  echo "Layer 2 — ISP first hop: no response to probes | color=gray"
 fi
 detail "Layer 3 — Internet via Cloudflare (${REFS[0]})" "$l1" "$a1" "$REF_MAX_MS"
 detail "Layer 3 — Internet via Google (${REFS[1]})" "$l2" "$a2" "$REF_MAX_MS"
